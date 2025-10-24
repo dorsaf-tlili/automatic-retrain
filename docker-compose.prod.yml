@@ -1,0 +1,221 @@
+version: '3.8'
+
+# Production Docker Compose configuration
+services:
+  # PostgreSQL database for Airflow
+  postgres:
+    image: postgres:13
+    container_name: yolo-postgres-prod
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-airflow123}
+      - POSTGRES_DB=airflow
+    volumes:
+      - postgres-data-prod:/var/lib/postgresql/data
+    networks:
+      - yolo-network-prod
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+    restart: always
+
+  # Redis for Celery
+  redis:
+    image: redis:7
+    container_name: yolo-redis-prod
+    networks:
+      - yolo-network-prod
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 50
+    restart: always
+
+  # MLflow tracking server with PostgreSQL backend
+  mlflow:
+    build:
+      context: .
+      target: production
+    container_name: yolo-mlflow-prod
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-artifacts-prod:/app/mlruns
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=postgresql://mlflow:${MLFLOW_DB_PASSWORD:-mlflow123}@mlflow-db:5432/mlflow
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/app/mlruns
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    networks:
+      - yolo-network-prod
+    depends_on:
+      - mlflow-db
+    restart: always
+    command: ["mlflow", "server", "--host", "0.0.0.0", "--port", "5000", "--backend-store-uri", "postgresql://mlflow:${MLFLOW_DB_PASSWORD:-mlflow123}@mlflow-db:5432/mlflow", "--default-artifact-root", "/app/mlruns"]
+
+  # MLflow database
+  mlflow-db:
+    image: postgres:13
+    container_name: yolo-mlflow-db-prod
+    environment:
+      - POSTGRES_USER=mlflow
+      - POSTGRES_PASSWORD=${MLFLOW_DB_PASSWORD:-mlflow123}
+      - POSTGRES_DB=mlflow
+    volumes:
+      - mlflow-db-data-prod:/var/lib/postgresql/data
+    networks:
+      - yolo-network-prod
+    restart: always
+
+  # Airflow webserver
+  airflow-webserver:
+    build:
+      context: .
+      target: production
+    container_name: yolo-airflow-webserver-prod
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./airflow/dags:/app/airflow/dags:ro
+      - ./src:/app/src:ro
+      - ./config:/app/config:ro
+      - ./gold-datasets:/app/gold-datasets
+      - ./models:/app/models
+      - airflow-logs-prod:/app/airflow/logs
+    environment:
+      - AIRFLOW_HOME=/app/airflow
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:${POSTGRES_PASSWORD:-airflow123}@postgres:5432/airflow
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:${POSTGRES_PASSWORD:-airflow123}@postgres:5432/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://:@redis:6379/0
+      - AIRFLOW__CORE__DAGS_FOLDER=/app/airflow/dags
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-your_secret_key_change_this}
+      - AIRFLOW__WEBSERVER__AUTHENTICATE=true
+      - AIRFLOW__WEBSERVER__AUTH_BACKEND=airflow.auth.backends.password_auth
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - PYTHONPATH=/app/src
+    networks:
+      - yolo-network-prod
+    depends_on:
+      - postgres
+      - redis
+      - mlflow
+    restart: always
+    command: ["airflow", "webserver"]
+
+  # Airflow scheduler
+  airflow-scheduler:
+    build:
+      context: .
+      target: production
+    container_name: yolo-airflow-scheduler-prod
+    volumes:
+      - ./airflow/dags:/app/airflow/dags:ro
+      - ./src:/app/src:ro
+      - ./config:/app/config:ro
+      - ./gold-datasets:/app/gold-datasets
+      - ./models:/app/models
+      - airflow-logs-prod:/app/airflow/logs
+    environment:
+      - AIRFLOW_HOME=/app/airflow
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:${POSTGRES_PASSWORD:-airflow123}@postgres:5432/airflow
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:${POSTGRES_PASSWORD:-airflow123}@postgres:5432/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://:@redis:6379/0
+      - AIRFLOW__CORE__DAGS_FOLDER=/app/airflow/dags
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - PYTHONPATH=/app/src
+    networks:
+      - yolo-network-prod
+    depends_on:
+      - postgres
+      - redis
+      - mlflow
+    restart: always
+    command: ["airflow", "scheduler"]
+
+  # Airflow workers (for Celery executor)
+  airflow-worker:
+    build:
+      context: .
+      target: production
+    container_name: yolo-airflow-worker-prod
+    volumes:
+      - ./airflow/dags:/app/airflow/dags:ro
+      - ./src:/app/src:ro
+      - ./config:/app/config:ro
+      - ./gold-datasets:/app/gold-datasets
+      - ./models:/app/models
+      - airflow-logs-prod:/app/airflow/logs
+    environment:
+      - AIRFLOW_HOME=/app/airflow
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:${POSTGRES_PASSWORD:-airflow123}@postgres:5432/airflow
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:${POSTGRES_PASSWORD:-airflow123}@postgres:5432/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://:@redis:6379/0
+      - AIRFLOW__CORE__DAGS_FOLDER=/app/airflow/dags
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - PYTHONPATH=/app/src
+    networks:
+      - yolo-network-prod
+    depends_on:
+      - postgres
+      - redis
+      - mlflow
+    restart: always
+    command: ["airflow", "celery", "worker"]
+    deploy:
+      replicas: 2
+
+  # Flower (Celery monitoring)
+  flower:
+    build:
+      context: .
+      target: production
+    container_name: yolo-flower-prod
+    ports:
+      - "5555:5555"
+    environment:
+      - AIRFLOW_HOME=/app/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://:@redis:6379/0
+    networks:
+      - yolo-network-prod
+    depends_on:
+      - redis
+    restart: always
+    command: ["airflow", "celery", "flower"]
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: yolo-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    networks:
+      - yolo-network-prod
+    depends_on:
+      - airflow-webserver
+      - mlflow
+    restart: always
+
+networks:
+  yolo-network-prod:
+    driver: bridge
+
+volumes:
+  postgres-data-prod:
+    driver: local
+  mlflow-db-data-prod:
+    driver: local
+  mlflow-artifacts-prod:
+    driver: local
+  airflow-logs-prod:
+    driver: local

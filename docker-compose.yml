@@ -1,0 +1,169 @@
+version: '3.8'
+
+services:
+  # Main application service
+  yolo-app:
+    build:
+      context: .
+      target: base
+    container_name: yolo-retrain-app
+    volumes:
+      - ./gold-datasets:/app/gold-datasets
+      - ./models:/app/models
+      - ./logs:/app/logs
+      - ./config:/app/config
+      - mlflow-data:/app/mlruns
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - PYTHONPATH=/app/src
+    networks:
+      - yolo-network
+    depends_on:
+      - mlflow
+    command: ["python", "main.py", "--help"]
+
+  # MLflow tracking server
+  mlflow:
+    build:
+      context: .
+      target: mlflow
+    container_name: yolo-mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/app/mlruns
+      - mlflow-db:/app
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=sqlite:///mlflow.db
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/app/mlruns
+    networks:
+      - yolo-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Airflow webserver
+  airflow-webserver:
+    build:
+      context: .
+      target: airflow
+    container_name: yolo-airflow-webserver
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./airflow/dags:/app/airflow/dags
+      - ./airflow/logs:/app/airflow/logs
+      - ./airflow/plugins:/app/airflow/plugins
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./gold-datasets:/app/gold-datasets
+      - ./models:/app/models
+      - airflow-db:/app/airflow
+    environment:
+      - AIRFLOW_HOME=/app/airflow
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=sqlite:////app/airflow/airflow.db
+      - AIRFLOW__CORE__DAGS_FOLDER=/app/airflow/dags
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - AIRFLOW__WEBSERVER__SECRET_KEY=change_this_secret_key
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - PYTHONPATH=/app/src
+    networks:
+      - yolo-network
+    depends_on:
+      - mlflow
+    command: ["airflow", "webserver", "--port", "8080"]
+
+  # Airflow scheduler
+  airflow-scheduler:
+    build:
+      context: .
+      target: airflow
+    container_name: yolo-airflow-scheduler
+    volumes:
+      - ./airflow/dags:/app/airflow/dags
+      - ./airflow/logs:/app/airflow/logs
+      - ./airflow/plugins:/app/airflow/plugins
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./gold-datasets:/app/gold-datasets
+      - ./models:/app/models
+      - airflow-db:/app/airflow
+    environment:
+      - AIRFLOW_HOME=/app/airflow
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=sqlite:////app/airflow/airflow.db
+      - AIRFLOW__CORE__DAGS_FOLDER=/app/airflow/dags
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - PYTHONPATH=/app/src
+    networks:
+      - yolo-network
+    depends_on:
+      - mlflow
+      - airflow-webserver
+    command: ["airflow", "scheduler"]
+
+  # Development environment with Jupyter
+  jupyter:
+    build:
+      context: .
+      target: development
+    container_name: yolo-jupyter
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/app
+      - mlflow-data:/app/mlruns
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - PYTHONPATH=/app/src
+    networks:
+      - yolo-network
+    depends_on:
+      - mlflow
+    profiles:
+      - development
+
+  # PostgreSQL database (optional, for production Airflow)
+  postgres:
+    image: postgres:13
+    container_name: yolo-postgres
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - yolo-network
+    profiles:
+      - production
+
+  # Redis (optional, for Celery executor)
+  redis:
+    image: redis:7
+    container_name: yolo-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - yolo-network
+    profiles:
+      - production
+
+networks:
+  yolo-network:
+    driver: bridge
+
+volumes:
+  mlflow-data:
+    driver: local
+  mlflow-db:
+    driver: local
+  airflow-db:
+    driver: local
+  postgres-data:
+    driver: local

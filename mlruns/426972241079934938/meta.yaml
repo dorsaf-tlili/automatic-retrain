@@ -1,0 +1,6 @@
+artifact_location: mlflow-artifacts:/426972241079934938
+creation_time: 1761305676754
+experiment_id: '426972241079934938'
+last_update_time: 1761305676754
+lifecycle_stage: active
+name: yolo_automatic_retrain

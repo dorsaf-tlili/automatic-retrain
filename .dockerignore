@@ -1,0 +1,93 @@
+# .dockerignore - Optimize Docker build context
+
+# Git
+.git
+.gitignore
+*.md
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.pytest_cache/
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data and models (copy via volumes instead)
+gold-datasets/*/
+models/train_*/
+models/champion/
+mlruns/
+logs/*.log
+
+# Airflow
+airflow/logs/
+airflow/airflow.db
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Development
+.env
+.env.local
+.env.development
+.env.production
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Backup files
+backup_*.tar.gz
+*.bak
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Node.js (if any)
+node_modules/
+npm-debug.log*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Large binary files
+*.pt
+*.pth
+*.onnx
+*.trt
+
+# Test files
+test_*/
+tests/
+*_test.py
+test_*.py

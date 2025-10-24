@@ -1,0 +1,134 @@
+# Training configuration for YOLO automatic retraining
+
+# Model configuration
+model:
+  size: "yolov8n"  # Options: yolov8n, yolov8s, yolov8m, yolov8l, yolov8x
+  pretrained: true
+  input_size: 640
+
+# Training parameters
+training:
+  epochs: 100
+  batch_size: 16
+  patience: 50  # Early stopping patience
+  save_period: 10  # Save model every N epochs
+  workers: 8
+  device: "auto"  # Options: auto, cpu, cuda:0, cuda:1, etc.
+  
+  # Optimizer settings
+  optimizer: "AdamW"  # Options: SGD, Adam, AdamW, RMSProp
+  lr0: 0.01  # Initial learning rate
+  lrf: 0.01  # Final learning rate (lr0 * lrf)
+  momentum: 0.937  # SGD momentum/Adam beta1
+  weight_decay: 0.0005  # Optimizer weight decay
+  warmup_epochs: 3.0  # Warmup epochs
+  warmup_momentum: 0.8  # Warmup initial momentum
+  warmup_bias_lr: 0.1  # Warmup initial bias lr
+
+# Data augmentation
+augmentation:
+  hsv_h: 0.015  # HSV-Hue augmentation (fraction)
+  hsv_s: 0.7    # HSV-Saturation augmentation (fraction)
+  hsv_v: 0.4    # HSV-Value augmentation (fraction)
+  degrees: 0.0  # Rotation degrees
+  translate: 0.1  # Translation fraction
+  scale: 0.5    # Scaling factor
+  shear: 0.0    # Shear degrees
+  perspective: 0.0  # Perspective transform
+  flipud: 0.0   # Vertical flip probability
+  fliplr: 0.5   # Horizontal flip probability
+  mosaic: 1.0   # Mosaic augmentation probability
+  mixup: 0.0    # MixUp augmentation probability
+  copy_paste: 0.0  # Copy-paste augmentation probability
+
+# Validation parameters
+validation:
+  conf: 0.001   # Confidence threshold
+  iou: 0.6      # NMS IoU threshold
+  max_det: 300  # Maximum detections per image
+  save_txt: false  # Save results to *.txt
+  save_conf: false  # Save confidences in --save-txt labels
+  save_json: false  # Save results to JSON file
+  
+# Loss function weights
+loss:
+  box: 7.5      # Box loss gain
+  cls: 0.5      # Classification loss gain
+  dfl: 1.5      # DFL loss gain
+
+# Datasets configuration
+datasets_root: "gold-datasets"
+models_dir: "models"
+
+# MLflow configuration
+mlflow:
+  tracking_uri: "mlruns"  # Local tracking or remote URI like "http://localhost:5000"
+  experiment_name: "yolo_automatic_retrain"
+  artifact_location: null  # Optional S3/Azure blob storage location
+  
+  # Model registry settings
+  model_registry:
+    enabled: true
+    model_name: "yolo_champion"
+    
+# Champion selection criteria
+champion_selection:
+  # Weights for different metrics (should sum to 1.0)
+  metric_weights:
+    "mAP@0.5:0.95": 0.4  # Most important metric
+    "mAP@0.5": 0.3
+    "precision": 0.15
+    "recall": 0.15
+  
+  # Minimum improvement threshold to replace champion (0.01 = 1% improvement)
+  min_improvement_threshold: 0.01
+  
+  # Primary metric for model comparison
+  primary_metric: "mAP@0.5:0.95"
+  
+  # Dataset split to use for evaluation
+  evaluation_dataset: "test"
+
+# Notification settings
+notifications:
+  enabled: true
+  email:
+    enabled: false  # Set to true and configure SMTP in Airflow
+    recipients: []  # List of email addresses
+  
+  slack:
+    enabled: false  # Set to true and configure Slack webhook
+    webhook_url: ""
+    channel: "#ml-notifications"
+  
+  teams:
+    enabled: false  # Set to true and configure Teams webhook
+    webhook_url: ""
+
+# Cleanup settings
+cleanup:
+  enabled: true
+  keep_last_n_runs: 5  # Keep only the last N training runs
+  clean_older_than_days: 30  # Clean artifacts older than N days
+
+# Resource monitoring
+monitoring:
+  log_system_metrics: true
+  log_gpu_metrics: true
+  memory_limit_gb: 32  # Training memory limit
+  
+# Advanced settings
+advanced:
+  # Multi-GPU training settings
+  multi_gpu: false
+  sync_bn: false  # Synchronize batch normalization
+  
+  # Mixed precision training
+  amp: true  # Automatic Mixed Precision
+  
+  # Gradient settings  
+  gradient_clip_val: 10.0  # Gradient clipping value
+  
+  # Model EMA (Exponential Moving Average)
+  ema_decay: 0.9999
+  ema_updates: 2000

@@ -1,0 +1,49 @@
+# YOLO Automatic Retraining System Requirements
+
+# Core ML/DL libraries
+torch>=2.0.0
+torchvision>=0.15.0
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+
+# MLflow for experiment tracking
+mlflow>=2.7.0
+boto3>=1.28.0  # For S3 artifact storage (optional)
+
+# Apache Airflow for orchestration
+apache-airflow>=2.7.0
+
+# Data handling
+numpy>=1.24.0
+pandas>=2.0.0
+PyYAML>=6.0
+pillow>=10.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+click>=8.1.0
+tqdm>=4.65.0
+
+# Development and testing (optional)
+pytest>=7.4.0
+black>=23.0.0
+flake8>=6.0.0
+isort>=5.12.0
+
+# Logging and monitoring
+tensorboard>=2.13.0
+wandb>=0.15.0  # Alternative to MLflow (optional)
+
+# System utilities
+psutil>=5.9.0
+pathlib2>=2.3.0  # For Python < 3.4 compatibility
+
+# Optional: Azure ML integration
+# azureml-mlflow>=1.51.0
+# azureml-core>=1.51.0
+
+# Optional: AWS integration  
+# sagemaker>=2.175.0
+
+# Optional: Google Cloud integration
+# google-cloud-storage>=2.10.0

@@ -1,0 +1,8 @@
+names:
+- person
+- bicycle
+- car
+nc: 80
+test: yolo_v1.1.0/test
+train: yolo_v1.1.0/train
+val: yolo_v1.1.0/validation
